@@ -15,7 +15,6 @@ function readfile(file){
     const data =fs.readFileSync(file,'utf-8');
     console.log("content is ",data);
 }
-
 function deletefile(file){
     if (!fs.existsSync(file)) {
         console.log(`File "${file}" does not exist.`);
@@ -73,4 +72,19 @@ createfile('notes.txt','jarvis wake up, daddy is home')
 readfile('notes.txt')
 openapp('Chess')
 
+//voice assistant
+
+import say from 'say';
+
+// speak text (voice and speed are optional)
+say.speak('Hello, I am Jarvis!', /* voice */ null, /* speed */ 1.0, (err) => {
+  if (err) {
+    console.error('Could not speak:', err);
+    return;
+  }
+  console.log('Finished speaking.');
+});
+
+// stop speaking (if needed)
+// say.stop(() => { console.log('Speech stopped.'); });
 
