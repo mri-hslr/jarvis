@@ -1,23 +1,40 @@
+//voice assistant
+//promise version for speak function
+import say from 'say';
+function speak(text,voice=null,speed=1.0){
+    return new Promise((resolve,reject)=>{
+        say.speak(text,voice,speed,err=>{
+            if(err){
+                return reject(err);
+            }
+            resolve();
+        })
+    })
+}
 
 //for crud operations on file
 
 import fs from 'fs'
-function createfile(file,content){
+async function createfile(file,content){
     fs.writeFileSync(file,content);
     console.log("file has been created");
+    await speak(`"${file}" has been created `);
 }
 
-function readfile(file){
+async function readfile(file){
     if (!fs.existsSync(file)) {
         console.log(`File "${file}" does not exist.`);
+        await speak(`file "${file}" does not exist`)
         return;
     }
     const data =fs.readFileSync(file,'utf-8');
     console.log("content is ",data);
+    await speak(`reading file "${file}".it says "${data}"`);
 }
-function deletefile(file){
+async function deletefile(file){
     if (!fs.existsSync(file)) {
         console.log(`File "${file}" does not exist.`);
+        await speak(`"${file}" has been deleted`);
         return;
     }
     fs.unlinkSync(file)
@@ -30,7 +47,12 @@ function deletefile(file){
 // for opening websites
 
 import open from 'open'
-open('https://www.google.com')
+async function openwebsite(url){
+    await speak(`opening "${url}"`);
+    await open(url);
+    console.log("website opened");
+}
+
 
 
 //for opening files with default app
@@ -38,11 +60,13 @@ import {exec} from 'child_process'
 import os from 'os'
 
 
-function openfile(path){
+async function openfile(path){
     if(!fs.existsSync(path)){
         console.log("file does not exist");
+        await speak("file does not exist");
     }
     else{
+        await speak(`opening file"${path}"`);
         if(os.platform()==='darwin'){
             exec(`open "${path}"`)// for macos
         }
@@ -55,7 +79,8 @@ function openfile(path){
     }
 }
 // to open any app
-function openapp(appname){
+async function openapp(appname){
+    await speak(`opening "${appname}"`);
     if(os.platform()==='darwin'){
         exec(`open -a "${appname}"`,(error)=>{
             if(error){
@@ -67,24 +92,11 @@ function openapp(appname){
         } )
     }
 }
-openfile('notes.txt');
-createfile('notes.txt','jarvis wake up, daddy is home')
-readfile('notes.txt')
-openapp('Chess')
-
-//voice assistant
-
-import say from 'say';
-
-// speak text (voice and speed are optional)
-say.speak('Hello, I am Jarvis!', /* voice */ null, /* speed */ 1.0, (err) => {
-  if (err) {
-    console.error('Could not speak:', err);
-    return;
-  }
-  console.log('Finished speaking.');
-});
-
-// stop speaking (if needed)
-// say.stop(() => { console.log('Speech stopped.'); });
-
+async function jarvisDemo(){
+    await openfile('notes.txt');
+    await createfile('notes.txt','jarvis wake up, daddy bought some gifts for you')
+    await readfile('notes.txt')
+    await openapp('Chess')
+    await openwebsite('https://www.youtube.com/');
+}
+jarvisDemo();
