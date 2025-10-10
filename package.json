@@ -12,8 +12,11 @@
   "description": "",
   "dependencies": {
     "child_process": "^1.0.2",
+    "mic": "^2.1.2",
+    "node-fetch": "^3.3.2",
     "open": "^10.2.0",
     "os": "^0.1.2",
-    "say": "^0.16.0"
+    "say": "^0.16.0",
+    "vosk-browser": "^0.0.8"
   }
 }

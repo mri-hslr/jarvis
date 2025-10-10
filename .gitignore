@@ -2,3 +2,52 @@ node_modules/
 .env
 .DS_Store
 *.log
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore virtual environment folders
+venv/
+env/
+.venv/
+ENV/
+.ENV/
+
+# Ignore build and distribution directories
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ignore Python cache and logs
+*.log
+*.pot
+*.pyc
+*.pyo
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# Ignore VS Code / IDE settings
+.vscode/
+.idea/
+
+# Ignore macOS and Windows system files
+.DS_Store
+Thumbs.db
+
+# Ignore environment files
+.env
+*.env
+
+# Ignore coverage or testing files
+.coverage
+htmlcov/
+.cache/
+pytest_cache/
+
+# Ignore temporary files
+*.tmp
+*.swp
+*.bak
