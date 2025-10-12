@@ -19,32 +19,32 @@ command_state = {
 }
 
 print("="*70)
-print("🔧 Initializing Voice Recognition...")
+print(" Initializing Voice Recognition...")
 print("="*70)
 
 # Initialize recognizer and microphone
 try:
     recognizer = sr.Recognizer()
     microphone = sr.Microphone()
-    print("✅ Speech Recognition loaded")
-    print("✅ Microphone initialized")
+    print(" Speech Recognition loaded")
+    print(" Microphone initialized")
 except Exception as e:
-    print(f"❌ Error initializing: {e}")
-    print("\n💡 Fix:")
+    print(f" Error initializing: {e}")
+    print("\n Fix:")
     print("   pip uninstall SpeechRecognition")
     print("   pip install SpeechRecognition")
     sys.exit(1)
 
 # Calibrate for ambient noise
-print("\n🎤 Calibrating microphone...")
+print("\n Calibrating microphone...")
 print("   Please wait 2 seconds (stay quiet)...")
 try:
     with microphone as source:
         recognizer.adjust_for_ambient_noise(source, duration=2)
-    print("✅ Calibration complete!")
+    print(" Calibration complete!")
 except Exception as e:
-    print(f"❌ Microphone error: {e}")
-    print("\n💡 Make sure microphone is connected and accessible")
+    print(f" Microphone error: {e}")
+    print("\n Make sure microphone is connected and accessible")
     sys.exit(1)
 
 print("="*70)
@@ -54,8 +54,8 @@ def listen_continuously():
     Background thread that listens for voice commands
     Uses Google's Speech Recognition API (requires internet)
     """
-    print("\n🎙️  Voice listener started!")
-    print("🔴 Speak clearly when you see 'Listening...'\n")
+    print("\n  Voice listener started!")
+    print(" Speak clearly when you see 'Listening...'\n")
     
     consecutive_errors = 0
     max_errors = 5
@@ -64,7 +64,7 @@ def listen_continuously():
         try:
             with microphone as source:
                 # Show listening indicator
-                print("🔴 Listening...                    ", end='\r')
+                print(" Listening...                    ", end='\r')
                 
                 # Listen for audio (5 second timeout, max 5 second phrase)
                 audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
@@ -83,7 +83,7 @@ def listen_continuously():
                     
                     # Clear line and show recognized text
                     print(" " * 50, end='\r')
-                    print(f"\n✅ HEARD: '{text}'")
+                    print(f"\n HEARD: '{text}'")
                     print(f"   Time: {time.strftime('%H:%M:%S')}\n")
                     
                     # Reset error counter on success
@@ -96,16 +96,16 @@ def listen_continuously():
             
         except sr.UnknownValueError:
             # Speech was unintelligible
-            print("❓ Couldn't understand (speak clearly)  ", end='\r')
+            print(" Couldn't understand (speak clearly)  ", end='\r')
             consecutive_errors = 0
             
         except sr.RequestError as e:
             # API error (usually network issue)
             consecutive_errors += 1
-            print(f"\n⚠️  Network error: {e}")
+            print(f"\n Network error: {e}")
             
             if consecutive_errors >= max_errors:
-                print("\n❌ Too many network errors. Check internet connection!")
+                print("\n Too many network errors. Check internet connection!")
                 break
             
             time.sleep(2)
@@ -113,10 +113,10 @@ def listen_continuously():
         except Exception as e:
             # Other errors
             consecutive_errors += 1
-            print(f"\n❌ Error: {e}")
+            print(f"\n Error: {e}")
             
             if consecutive_errors >= max_errors:
-                print("\n❌ Too many errors. Stopping listener.")
+                print("\n Too many errors. Stopping listener.")
                 break
                 
             time.sleep(1)
@@ -136,7 +136,7 @@ def get_command():
     if command_state["is_new"]:
         text = command_state["current"]
         command_state["is_new"] = False  # Mark as consumed
-        print(f"📤 Sent to Node.js: '{text}'\n")
+        print(f" Sent to Node.js: '{text}'\n")
     
     return jsonify({
         "text": text,
@@ -163,12 +163,12 @@ def clear_command():
 
 if __name__ == "__main__":
     print("\n" + "="*70)
-    print("🎙️  JARVIS VOICE LISTENER - READY")
+    print("  JARVIS VOICE LISTENER - READY")
     print("="*70)
     print("Server:    http://127.0.0.1:5000")
     print("Endpoints: /listen  /status  /clear")
     print("\nRecognition: Google Speech API (requires internet)")
-    print("\n💡 TIPS:")
+    print("\n TIPS:")
     print("   • Speak at normal pace, clearly")
     print("   • Wait for 'Listening...' indicator")
     print("   • Reduce background noise for best results")
@@ -185,5 +185,5 @@ if __name__ == "__main__":
             use_reloader=False     # Don't restart on code changes
         )
     except KeyboardInterrupt:
-        print("\n\n✅ Voice listener stopped gracefully")
+        print("\n\n Voice listener stopped gracefully")
         sys.exit(0)

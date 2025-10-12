@@ -92,7 +92,7 @@ async function openapp(appname) {
     }
 }
 
-// Demo function (keep your original)
+// Demo function (keep original)
 async function jarvisDemo() {
     await openfile('notes.txt');
     await createfile('notes.txt', 'jarvis wake up, daddy bought some gifts for you')
@@ -101,9 +101,9 @@ async function jarvisDemo() {
     await openwebsite('https://www.youtube.com/');
 }
 
-// ============================================================================
+//till here one-way communication
 // NEW: VOICE INPUT FUNCTIONALITY
-// ============================================================================
+
 
 // Track executed commands to prevent duplicates
 const executedCommands = new Set();
@@ -124,7 +124,7 @@ async function handleVoiceCommand(command) {
     setTimeout(() => executedCommands.delete(normalized), 5000); // Remove after 5s
     
     console.log("\n" + "=".repeat(60));
-    console.log(`🎯 EXECUTING: "${command}"`);
+    console.log(` EXECUTING: "${command}"`);
     console.log("=".repeat(60));
     
     try {
@@ -184,12 +184,12 @@ async function handleVoiceCommand(command) {
         
         // Unknown command
         else {
-            console.log(`❓ Unknown command: "${command}"`);
+            console.log(` Unknown command: "${command}"`);
             console.log("Available: jarvis, open youtube, create/read/delete file, open app");
         }
         
     } catch (err) {
-        console.error("❌ Error executing command:", err);
+        console.error(" Error executing command:", err);
     }
     
     console.log("=".repeat(60) + "\n");
@@ -210,7 +210,7 @@ async function listenForVoiceInput() {
         const command = data.text?.trim();
         
         if (command && command.length > 0) {
-            console.log(`\n📥 Voice input received: "${command}"`);
+            console.log(`\n Voice input received: "${command}"`);
             
             isExecuting = true;
             await handleVoiceCommand(command);
@@ -219,7 +219,7 @@ async function listenForVoiceInput() {
         
     } catch (err) {
         if (err.code !== 'ECONNREFUSED') {
-            console.error("❌ Error fetching voice input:", err.message);
+            console.error(" Error fetching voice input:", err.message);
         }
     }
 }
@@ -231,10 +231,10 @@ async function checkVoiceAPI() {
     try {
         const res = await fetch("http://127.0.0.1:5000/status");
         const data = await res.json();
-        console.log("✅ Voice API connected:", data);
+        console.log(" Voice API connected:", data);
         return true;
     } catch (err) {
-        console.log("❌ Voice API not running!");
+        console.log(" Voice API not running!");
         return false;
     }
 }
@@ -242,7 +242,7 @@ async function checkVoiceAPI() {
 // Start voice-controlled Jarvis
 async function startVoiceJarvis() {
     console.log("\n" + "=".repeat(60));
-    console.log("🤖 JARVIS VOICE ASSISTANT");
+    console.log(" JARVIS VOICE ASSISTANT");
     console.log("=".repeat(60));
     
     const isAPIRunning = await checkVoiceAPI();
@@ -258,26 +258,25 @@ async function startVoiceJarvis() {
         return;
     }
     
-    console.log("\n✅ Voice control ENABLED");
-    console.log("\n📋 Available Voice Commands:");
-    console.log("   🎤 'Hey Jarvis' or 'Jarvis'     - Wake word");
-    console.log("   🎥 'Open YouTube'               - Opens YouTube");
-    console.log("   🌐 'Open Google'                - Opens Google");
-    console.log("   📄 'Create file'                - Creates notes.txt");
-    console.log("   📖 'Read file'                  - Reads notes.txt");
-    console.log("   🗑️  'Delete file'               - Deletes notes.txt");
-    console.log("   📱 'Open app'                   - Opens Chess");
-    console.log("   📝 'Open notes'                 - Opens notes.txt");
+    console.log("\n Voice control ENABLED");
+    console.log("\n Available Voice Commands:");
+    console.log("    'Hey Jarvis' or 'Jarvis'     - Wake word");
+    console.log("    'Open YouTube'               - Opens YouTube");
+    console.log("    'Open Google'                - Opens Google");
+    console.log("    'Create file'                - Creates notes.txt");
+    console.log("    'Read file'                  - Reads notes.txt");
+    console.log("     'Delete file'               - Deletes notes.txt");
+    console.log("    'Open app'                   - Opens Chess");
+    console.log("    'Open notes'                 - Opens notes.txt");
     console.log("=".repeat(60));
-    console.log("\n🎙️  Listening for your voice commands...\n");
+    console.log("\n  Listening for your voice commands...\n");
     
     // Poll every 1 second for voice commands
     setInterval(listenForVoiceInput, 1000);
 }
 
-// ============================================================================
 // CHOOSE YOUR MODE
-// ============================================================================
+
 
 // Option 1: Run demo (your original function)
 // jarvisDemo();
