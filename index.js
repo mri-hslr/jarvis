@@ -1,510 +1,306 @@
-//voice assistant
-//promise version for speak function
-import say from 'say';
-import fetch from 'node-fetch';
+// =================================================
+// JARVIS MAIN FILE (index.js) - FIXED POLLING & TIMING
+// =================================================
 
-function speak(text, voice = null, speed = 1.0) {
-    return new Promise((resolve, reject) => {
-        say.speak(text, voice, speed, err => {
-            if (err) {
-                return reject(err);
-            }
-            resolve();
-        })
-    })
+import fetch from "node-fetch";
+import say from "say";
+import fs from "fs";
+import open from "open";
+import { exec } from "child_process";
+import os from "os";
+
+import {
+    evaluateAndActOnDistractions,
+    endFocusMode
+} from "./focusManager.js";
+
+
+// =================================================
+// 1. IMPROVED SPEAK FUNCTION (GUARANTEED NO ECHO)
+// =================================================
+async function speak(text, voice = null, speed = 1.0) {
+    console.log(`SPEAKING: ${text}`);
+
+    // 1 — MUTE immediately
+    try {
+        await fetch("http://127.0.0.1:5000/mute", { method: "POST" });
+    } catch (err) {
+        console.log("⚠️ Mute failed:", err.message);
+    }
+
+    // 2 — Small delay to ensure mute takes effect
+    await new Promise(r => setTimeout(r, 100));
+
+    // 3 — Speak with callback
+    await new Promise((resolve) => {
+        say.speak(text, voice, speed, () => {
+            // macOS audio buffer delay
+            setTimeout(resolve, 700);
+        });
+    });
+
+    // 4 — Extra buffer to clear ANY remaining audio
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 5 — UNMUTE
+    try {
+        await fetch("http://127.0.0.1:5000/unmute", { method: "POST" });
+    } catch (err) {
+        console.log("⚠️ Unmute failed:", err.message);
+    }
+
+    // 6 — Small delay after unmute before listening
+    await new Promise(r => setTimeout(r, 200));
 }
 
-//for crud operations on file
-import fs from 'fs'
+export { speak };
 
-// Dynamic file creation with content
+
+// =================================================
+// 2. FILE + APP OPERATIONS
+// =================================================
+
 async function createfile(file, content) {
     fs.writeFileSync(file, content);
-    console.log(`✅ File "${file}" has been created`);
     await speak(`${file} has been created`);
 }
 
-// Dynamic file reading
 async function readfile(file) {
-    if (!fs.existsSync(file)) {
-        console.log(`❌ File "${file}" does not exist.`);
-        await speak(`file ${file} does not exist`)
-        return;
-    }
-    const data = fs.readFileSync(file, 'utf-8');
-    console.log(`📄 Content of ${file}:`, data);
+    if (!fs.existsSync(file)) return speak(`file ${file} does not exist`);
+    const data = fs.readFileSync(file, "utf-8");
     await speak(`reading file ${file}. it says ${data}`);
 }
 
-// Dynamic file deletion
 async function deletefile(file) {
-    if (!fs.existsSync(file)) {
-        console.log(`❌ File "${file}" does not exist.`);
-        await speak(`${file} does not exist`);
-        return;
-    }
-    fs.unlinkSync(file)
-    console.log(`🗑️  File "${file}" is deleted`);
+    if (!fs.existsSync(file)) return speak(`${file} does not exist`);
+    fs.unlinkSync(file);
     await speak(`${file} has been deleted`);
 }
 
-// for opening websites
-import open from 'open'
-
-// Smart website opening with clean speech
-async function openwebsite(url, siteName) {
-    await speak(`opening ${siteName}`);
-    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-    await open(fullUrl);
-    console.log(`🌐 Website opened: ${fullUrl}`);
+async function openwebsite(url, name) {
+    await speak(`opening ${name}`);
+    await open(url.startsWith("http") ? url : `https://${url}`);
 }
-
-//for opening files with default app
-import { exec } from 'child_process'
-import os from 'os'
 
 async function openfile(path) {
-    if (!fs.existsSync(path)) {
-        console.log("❌ File does not exist");
-        await speak("file does not exist");
-    }
-    else {
-        await speak(`opening file ${path}`);
-        if (os.platform() === 'darwin') {
-            exec(`open "${path}"`)// for macos
-        }
-        else if (os.platform() === 'win32') {
-            exec(`start "" "${path}"`)// for windows
-        }
-        else {
-            exec(`xdg-open "${path}" `)// for linux
-        }
-    }
+    if (!fs.existsSync(path)) return speak("file does not exist");
+    await speak(`opening ${path}`);
+
+    if (os.platform() === "darwin") exec(`open "${path}"`);
+    else if (os.platform() === "win32") exec(`start "" "${path}"`);
+    else exec(`xdg-open "${path}"`);
 }
 
-// Dynamic app opening
 async function openapp(appname) {
     await speak(`opening ${appname}`);
-    if (os.platform() === 'darwin') {
-        exec(`open -a "${appname}"`, (error) => {
-            if (error) {
-                console.log(`❌ Failed opening ${appname}`);
-                speak(`Could not open ${appname}`);
-            }
-            else {
-                console.log(`✅ Opened ${appname} successfully`);
-            }
-        })
-    }
-    else if (os.platform() === 'win32') {
-        exec(`start ${appname}`, (error) => {
-            if (error) {
-                console.log(`❌ Failed opening ${appname}`);
-                speak(`Could not open ${appname}`);
-            }
-            else {
-                console.log(`✅ Opened ${appname} successfully`);
-            }
-        })
-    }
-    else {
-        // Linux
-        exec(`${appname}`, (error) => {
-            if (error) {
-                console.log(`❌ Failed opening ${appname}`);
-                speak(`Could not open ${appname}`);
-            }
-            else {
-                console.log(`✅ Opened ${appname} successfully`);
-            }
-        })
-    }
+    if (os.platform() === "darwin") exec(`open -a "${appname}"`);
+    else if (os.platform() === "win32") exec(`start ${appname}`);
+    else exec(`${appname}`);
 }
 
-// Track executed commands to prevent duplicates
-const executedCommands = new Set();
-let isExecuting = false;
 
-// HARDCODED COMMAND HANDLER - Fast and Reliable
-async function handleVoiceCommand(command) {
-    const normalized = command.toLowerCase().trim();
+// =================================================
+// 3. COMMAND HANDLER
+// =================================================
+
+const recentCommands = new Map();
+let isProcessing = false;
+
+async function handleCommand(cmdRaw) {
+    const command = cmdRaw.toLowerCase().trim();
     
-    // Create unique ID for this specific command instance
-    const commandId = `${normalized}-${Date.now()}`;
+    // Prevent duplicate/echo processing
+    const now = Date.now();
+    const lastTime = recentCommands.get(command) || 0;
     
-    // Prevent duplicate execution
-    if (executedCommands.has(commandId)) {
-        console.log(`⊘ Duplicate command ignored: "${normalized}"`);
+    if (now - lastTime < 3000) {
+        console.log(`⏭️  Skipping duplicate: "${command}"`);
         return;
     }
     
-    // Mark as executed
-    executedCommands.add(commandId);
-    setTimeout(() => executedCommands.delete(commandId), 3000);
+    recentCommands.set(command, now);
     
-    console.log("\n" + "=".repeat(60));
-    console.log(`🎯 EXECUTING: "${command}"`);
-    console.log("=".repeat(60));
-    
+    // Cleanup old entries
+    for (const [cmd, time] of recentCommands.entries()) {
+        if (now - time > 5000) recentCommands.delete(cmd);
+    }
+
+    // Prevent overlapping command execution
+    if (isProcessing) {
+        console.log("⏳ Already processing a command, skipping...");
+        return;
+    }
+
+    isProcessing = true;
+    console.log(`🎤 VOICE COMMAND: "${command}"`);
+
     try {
-        // ============ HARDCODED COMMANDS - EXACT MATCH ============
-        
         // WAKE WORD
-        if (normalized === "jarvis" || normalized === "hey jarvis" || normalized === "hi jarvis") {
-            console.log("→ Wake word detected");
-            await speak("Yes, I am here! How can I help you?");
+        if (["jarvis", "hey jarvis", "hi jarvis", "okay jarvis"].includes(command)) {
+            await speak("Yes, I am here. How can I help you?");
+            return;
         }
-        
-        // ========== WEBSITES ==========
-        else if (normalized === "open youtube") {
-            console.log("→ Opening YouTube");
-            await openwebsite("https://www.youtube.com/", "YouTube");
+
+        // FOCUS MODE
+        if (command === "start focus mode" || command === "focus mode") {
+            await speak("Starting focus mode. Scanning for distractions.");
+            const res = await evaluateAndActOnDistractions({
+                cpuPercent: 8,
+                memMB: 150,
+                topN: 12
+            });
+            if (res.acted) {
+                await speak("Say pause them or keep them.");
+            } else {
+                await speak("No distracting processes found. You're all set.");
+            }
+            return;
         }
-        
-        else if (normalized === "open google") {
-            console.log("→ Opening Google");
-            await openwebsite("https://www.google.com/", "Google");
+
+        if (command === "pause them" || command === "pause all") {
+            const res = await evaluateAndActOnDistractions({
+                cpuPercent: 1,
+                memMB: 1,
+                topN: 20
+            });
+            for (const p of res.candidates) {
+                try { process.kill(p.pid, "SIGSTOP"); } catch {}
+            }
+            await speak("I have paused them.");
+            return;
         }
-        
-        else if (normalized === "open facebook") {
-            console.log("→ Opening Facebook");
-            await openwebsite("https://www.facebook.com/", "Facebook");
+
+        if (command === "keep them" || command === "keep all") {
+            await speak("Okay, keeping them running.");
+            return;
         }
-        
-        else if (normalized === "open twitter") {
-            console.log("→ Opening Twitter");
-            await openwebsite("https://www.twitter.com/", "Twitter");
+
+        if (command === "end focus mode" || command === "stop focus mode") {
+            await endFocusMode();
+            return;
         }
-        
-        else if (normalized === "open instagram") {
-            console.log("→ Opening Instagram");
-            await openwebsite("https://www.instagram.com/", "Instagram");
+
+        // WEBSITES
+        if (command === "open youtube" || command === "youtube") {
+            return openwebsite("https://youtube.com", "YouTube");
         }
-        
-        else if (normalized === "open github") {
-            console.log("→ Opening GitHub");
-            await openwebsite("https://www.github.com/", "GitHub");
+        if (command === "open google" || command === "google") {
+            return openwebsite("https://google.com", "Google");
         }
-        
-        else if (normalized === "open reddit") {
-            console.log("→ Opening Reddit");
-            await openwebsite("https://www.reddit.com/", "Reddit");
+        if (command === "open instagram" || command === "instagram") {
+            return openwebsite("https://instagram.com", "Instagram");
         }
-        
-        else if (normalized === "open linkedin") {
-            console.log("→ Opening LinkedIn");
-            await openwebsite("https://www.linkedin.com/", "LinkedIn");
+
+        // APPS
+        if (command === "open chrome" || command === "chrome") {
+            return openapp("Google Chrome");
         }
-        
-        // ========== APPS ==========
-        else if (normalized === "open chess") {
-            console.log("→ Opening Chess");
-            await openapp("Chess");
+        if (command === "open whatsapp" || command === "whatsapp") {
+            return openapp("WhatsApp");
         }
-        
-        else if (normalized === "open whatsapp") {
-            console.log("→ Opening WhatsApp");
-            await openapp("WhatsApp");
+        if (command === "open safari" || command === "safari") {
+            return openapp("Safari");
         }
-        
-        else if (normalized === "open photo booth") {
-            console.log("→ Opening Photo Booth");
-            await openapp("Photo Booth");
+
+        // FILES
+        if (command === "create demo file") {
+            return createfile("demo.txt", "This is a demo file");
         }
-        
-        else if (normalized === "open safari") {
-            console.log("→ Opening Safari");
-            await openapp("Safari");
+        if (command === "read demo file") {
+            return readfile("demo.txt");
         }
-        
-        else if (normalized === "open chrome") {
-            console.log("→ Opening Chrome");
-            await openapp("Google Chrome");
+        if (command === "delete demo file") {
+            return deletefile("demo.txt");
         }
-        
-        else if (normalized === "open calculator") {
-            console.log("→ Opening Calculator");
-            await openapp("Calculator");
+        if (command === "open demo file") {
+            return openfile("demo.txt");
         }
-        
-        else if (normalized === "open calendar") {
-            console.log("→ Opening Calendar");
-            await openapp("Calendar");
+
+        // UTILITIES
+        if (command === "what time is it" || command === "time") {
+            return speak(`The time is ${new Date().toLocaleTimeString()}`);
         }
-        
-        else if (normalized === "open mail") {
-            console.log("→ Opening Mail");
-            await openapp("Mail");
+        if (command === "what date is it" || command === "date") {
+            return speak(`Today is ${new Date().toLocaleDateString()}`);
         }
-        
-        else if (normalized === "open music") {
-            console.log("→ Opening Music");
-            await openapp("Music");
+
+        // POLITE
+        if (command.includes("thank you") || command === "thanks") {
+            return speak("You're welcome!");
         }
-        
-        else if (normalized === "open notes") {
-            console.log("→ Opening Notes app");
-            await openapp("Notes");
+        if (command.includes("goodbye") || command === "bye") {
+            return speak("Goodbye! Have a great day!");
         }
-        
-        // ========== FILE OPERATIONS ==========
-        
-        // CREATE FILES
-        else if (normalized === "create demo file") {
-            console.log("→ Creating demo.txt");
-            await createfile("demo.txt", "This is a demo file created by Jarvis");
-        }
-        
-        else if (normalized === "create test file") {
-            console.log("→ Creating test.txt");
-            await createfile("test.txt", "Hello, this is a test file");
-        }
-        
-        else if (normalized === "create yash file") {
-            console.log("→ Creating yash.txt");
-            await createfile("yash.txt", "Hello, I am Yash and this is my file");
-        }
-        
-        else if (normalized === "create notes file") {
-            console.log("→ Creating notes.txt");
-            await createfile("notes.txt", "Jarvis notes: All systems operational");
-        }
-        
-        else if (normalized === "create todo file") {
-            console.log("→ Creating todo.txt");
-            await createfile("todo.txt", "Todo: Complete Jarvis voice assistant project");
-        }
-        
-        // READ FILES
-        else if (normalized === "read demo file") {
-            console.log("→ Reading demo.txt");
-            await readfile("demo.txt");
-        }
-        
-        else if (normalized === "read test file") {
-            console.log("→ Reading test.txt");
-            await readfile("test.txt");
-        }
-        
-        else if (normalized === "read yash file") {
-            console.log("→ Reading yash.txt");
-            await readfile("yash.txt");
-        }
-        
-        else if (normalized === "read notes file") {
-            console.log("→ Reading notes.txt");
-            await readfile("notes.txt");
-        }
-        
-        else if (normalized === "read todo file") {
-            console.log("→ Reading todo.txt");
-            await readfile("todo.txt");
-        }
-        
-        // DELETE FILES
-        else if (normalized === "delete demo file") {
-            console.log("→ Deleting demo.txt");
-            await deletefile("demo.txt");
-        }
-        
-        else if (normalized === "delete test file") {
-            console.log("→ Deleting test.txt");
-            await deletefile("test.txt");
-        }
-        
-        else if (normalized === "delete yash file") {
-            console.log("→ Deleting yash.txt");
-            await deletefile("yash.txt");
-        }
-        
-        else if (normalized === "delete notes file") {
-            console.log("→ Deleting notes.txt");
-            await deletefile("notes.txt");
-        }
-        
-        else if (normalized === "delete todo file") {
-            console.log("→ Deleting todo.txt");
-            await deletefile("todo.txt");
-        }
-        
-        // OPEN FILES
-        else if (normalized === "open demo file") {
-            console.log("→ Opening demo.txt");
-            await openfile("demo.txt");
-        }
-        
-        else if (normalized === "open test file") {
-            console.log("→ Opening test.txt");
-            await openfile("test.txt");
-        }
-        
-        // ========== UTILITY COMMANDS ==========
-        else if (normalized === "what time is it" || normalized === "tell me the time") {
-            const time = new Date().toLocaleTimeString();
-            console.log(`→ Current time: ${time}`);
-            await speak(`The time is ${time}`);
-        }
-        
-        else if (normalized === "what date is it" || normalized === "tell me the date") {
-            const date = new Date().toLocaleDateString();
-            console.log(`→ Current date: ${date}`);
-            await speak(`Today is ${date}`);
-        }
-        
-        else if (normalized === "thank you jarvis" || normalized === "thanks jarvis") {
-            console.log("→ You're welcome");
-            await speak("You're welcome! Happy to help.");
-        }
-        
-        else if (normalized === "goodbye jarvis" || normalized === "bye jarvis") {
-            console.log("→ Goodbye");
-            await speak("Goodbye! Have a great day.");
-        }
-        
+
         // UNKNOWN COMMAND
-        else {
-            console.log(`❓ Unknown command: "${command}"`);
-            console.log("💡 Please use exact commands from the list");
-            await speak("Sorry, I don't recognize that command. Please use exact phrases.");
-        }
-        
+        await speak("Sorry, I did not understand that command.");
+
     } catch (err) {
-        console.error("❌ Error executing command:", err);
+        console.error("❌ Command error:", err);
+        try {
+            await speak("Sorry, something went wrong.");
+        } catch {}
+    } finally {
+        isProcessing = false;
     }
-    
-    console.log("=".repeat(60) + "\n");
 }
 
-// Poll Flask API for voice commands
-async function listenForVoiceInput() {
-    if (isExecuting) return;
-    
+
+// =================================================
+// 4. POLL PYTHON API
+// =================================================
+
+let consecutiveErrors = 0;
+const MAX_ERRORS = 10;
+
+async function pollVoice() {
     try {
-        const res = await fetch("http://127.0.0.1:5000/listen_and_consume");
-        
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
-        
+        const res = await fetch("http://127.0.0.1:5000/listen_and_consume", {
+            timeout: 2000
+        });
         const data = await res.json();
-        const command = data.text?.trim();
-        
-        if (command && command.length > 0) {
-            console.log(`\n🎤 Voice input received: "${command}"`);
-            
-            isExecuting = true;
-            await handleVoiceCommand(command);
-            isExecuting = false;
+        const text = data.text?.trim();
+
+        if (text) {
+            await handleCommand(text);
         }
         
+        consecutiveErrors = 0;
+
     } catch (err) {
-        if (err.code !== 'ECONNREFUSED') {
-            console.error("❌ Error fetching voice input:", err.message);
+        consecutiveErrors++;
+        
+        if (consecutiveErrors >= MAX_ERRORS) {
+            console.error("❌ Too many polling errors. Is Python listener running?");
+            console.error("   Start it with: python3 listener.py");
+            process.exit(1);
         }
     }
 }
 
-// Check if Flask server is running
-async function checkVoiceAPI() {
-    console.log("🔍 Checking voice API...");
-    
-    try {
-        const res = await fetch("http://127.0.0.1:5000/status");
-        const data = await res.json();
-        console.log("✅ Voice API connected:", data);
-        return true;
-    } catch (err) {
-        console.log("❌ Voice API not running!");
-        return false;
-    }
+
+// =================================================
+// 5. START JARVIS
+// =================================================
+
+console.log("🤖 Jarvis is starting...");
+console.log("📡 Connecting to voice listener...");
+
+// Check if Python listener is running
+try {
+    await fetch("http://127.0.0.1:5000/status");
+    console.log("✅ Voice listener connected");
+    console.log("🎤 Listening for commands...");
+    console.log("\nTry saying:");
+    console.log("  - 'Jarvis'");
+    console.log("  - 'Start focus mode'");
+    console.log("  - 'Open YouTube'");
+    console.log("  - 'What time is it'\n");
+} catch {
+    console.error("❌ Cannot connect to Python listener!");
+    console.error("   Make sure to run: python3 listener.py");
+    process.exit(1);
 }
 
-// Start voice-controlled Jarvis
-async function startVoiceJarvis() {
-    console.log("\n" + "=".repeat(70));
-    console.log("🤖 JARVIS VOICE ASSISTANT - HARDCODED COMMANDS");
-    console.log("=".repeat(70));
-    
-    const isAPIRunning = await checkVoiceAPI();
-    
-    if (!isAPIRunning) {
-        console.log("\n⚠️  Voice API not detected.");
-        console.log("To enable VOICE CONTROL:");
-        console.log("1. Install: pip install SpeechRecognition pyaudio flask");
-        console.log("2. Run: python voice_listener.py");
-        console.log("3. Restart this script\n");
-        return;
-    }
-    
-    console.log("\n✅ Voice control ENABLED");
-    console.log("\n" + "=".repeat(70));
-    console.log("📢 EXACT VOICE COMMANDS (say these exactly):");
-    console.log("=".repeat(70));
-    
-    console.log("\n🎤 WAKE:");
-    console.log("   • 'Jarvis' or 'Hey Jarvis'");
-    
-    console.log("\n🌐 WEBSITES:");
-    console.log("   • 'open youtube'");
-    console.log("   • 'open google'");
-    console.log("   • 'open facebook'");
-    console.log("   • 'open twitter'");
-    console.log("   • 'open instagram'");
-    console.log("   • 'open github'");
-    console.log("   • 'open reddit'");
-    console.log("   • 'open linkedin'");
-    
-    console.log("\n📱 APPS:");
-    console.log("   • 'open chess'");
-    console.log("   • 'open whatsapp'");
-    console.log("   • 'open photo booth'");
-    console.log("   • 'open safari'");
-    console.log("   • 'open chrome'");
-    console.log("   • 'open calculator'");
-    console.log("   • 'open calendar'");
-    console.log("   • 'open mail'");
-    console.log("   • 'open music'");
-    console.log("   • 'open notes'");
-    
-    console.log("\n📄 CREATE FILES:");
-    console.log("   • 'create demo file'");
-    console.log("   • 'create test file'");
-    console.log("   • 'create yash file'");
-    console.log("   • 'create notes file'");
-    console.log("   • 'create todo file'");
-    
-    console.log("\n📖 READ FILES:");
-    console.log("   • 'read demo file'");
-    console.log("   • 'read test file'");
-    console.log("   • 'read yash file'");
-    console.log("   • 'read notes file'");
-    console.log("   • 'read todo file'");
-    
-    console.log("\n🗑️  DELETE FILES:");
-    console.log("   • 'delete demo file'");
-    console.log("   • 'delete test file'");
-    console.log("   • 'delete yash file'");
-    console.log("   • 'delete notes file'");
-    console.log("   • 'delete todo file'");
-    
-    console.log("\n📂 OPEN FILES:");
-    console.log("   • 'open demo file'");
-    console.log("   • 'open test file'");
-    
-    console.log("\n⏰ UTILITY:");
-    console.log("   • 'what time is it'");
-    console.log("   • 'what date is it'");
-    console.log("   • 'thank you jarvis'");
-    console.log("   • 'goodbye jarvis'");
-    
-    console.log("\n" + "=".repeat(70));
-    console.log("💡 TIP: Say commands EXACTLY as shown above for best results");
-    console.log("=".repeat(70));
-    console.log("\n🎧 Listening for your voice commands...\n");
-    
-    // Poll every 1 second for voice commands
-    setInterval(listenForVoiceInput, 1000);
-}
-
-// Start voice-controlled Jarvis
-startVoiceJarvis();
+// Start polling at optimal rate
+setInterval(pollVoice, 500);  // Poll every 500ms for responsiveness
