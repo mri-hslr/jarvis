@@ -1,0 +1,19 @@
+{
+  "tasks": [],
+  "reminders": [],
+  "intervals": [
+    {
+      "id": 1763536310437,
+      "text": "drink water",
+      "intervalSeconds": 3600,
+      "nextTrigger": 1763539910437,
+      "type": "interval"
+    }
+  ],
+  "workStats": {
+    "sessionsToday": 1,
+    "totalFocusTime": 0,
+    "lastSessionEnd": null
+  },
+  "lastSaved": "2025-11-19T07:12:26.507Z"
+}

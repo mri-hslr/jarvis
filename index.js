@@ -1,5 +1,5 @@
 // =================================================
-// JARVIS MAIN FILE (index.js) - FIXED POLLING & TIMING
+// JARVIS MAIN FILE (index.js) - COMPLETE VERSION
 // =================================================
 
 import fetch from "node-fetch";
@@ -20,6 +20,21 @@ import {
     getSystemStatus,
     optimizeSystem
 } from "./resourceMonitor.js";
+
+import {
+    addReminder,
+    addInterval,
+    startFocusSession,
+    endFocusSession,
+    listTasks,
+    clearAll,
+    getStats,
+    startPomodoro,
+    startShortBreak,
+    startLongBreak,
+    remindWater,
+    remindStretch
+} from "./scheduler.js";
 
 
 // =================================================
@@ -179,7 +194,9 @@ async function handleCommand(cmdRaw) {
             return;
         }
 
+        // ============================================
         // FOCUS MODE
+        // ============================================
         if (command === "start focus mode" || command === "focus mode") {
             await speak("Starting focus mode. Scanning for distractions.");
             const res = await evaluateAndActOnDistractions({
@@ -217,24 +234,105 @@ async function handleCommand(cmdRaw) {
             await endFocusMode();
             return;
         }
-        // SYSTEM MONITORING
+
+        // ============================================
+        // RESOURCE MONITORING
+        // ============================================
         if (command === "start monitoring" || command === "monitor system") {
-            return startMonitoring();
+            await startMonitoring();
+            return;
         }
 
         if (command === "stop monitoring") {
-            return stopMonitoring();
+            await stopMonitoring();
+            return;
         }
 
         if (command === "system status" || command === "check system") {
-            return getSystemStatus();
+            await getSystemStatus();
+            return;
         }
 
         if (command === "optimize system" || command === "clean system") {
-            return optimizeSystem();
+            await optimizeSystem();
+            return;
         }
 
+        // ============================================
+        // SCHEDULER & TIME MANAGEMENT
+        // ============================================
+        
+        // Pomodoro & Focus Sessions
+        if (command === "start pomodoro" || command === "pomodoro") {
+            await startPomodoro();
+            return;
+        }
+
+        if (command === "start focus session") {
+            await startFocusSession(25);
+            return;
+        }
+
+        if (command === "end session" || command === "stop session") {
+            await endFocusSession();
+            return;
+        }
+
+        // Quick Break Commands
+        if (command === "short break" || command === "take a break") {
+            await startShortBreak();
+            return;
+        }
+
+        if (command === "long break") {
+            await startLongBreak();
+            return;
+        }
+
+        // Recurring Reminders
+        if (command === "remind me to drink water") {
+            await remindWater();
+            return;
+        }
+
+        if (command === "remind me to stretch") {
+            await remindStretch();
+            return;
+        }
+
+        // Generic reminders with time parsing
+        if (command.startsWith("remind me in")) {
+            const match = command.match(/remind me in (\d+) (minute|minutes|hour|hours) to (.+)/);
+            if (match) {
+                const amount = parseInt(match[1]);
+                const unit = match[2];
+                const task = match[3];
+                
+                const seconds = unit.startsWith("hour") ? amount * 3600 : amount * 60;
+                await addReminder(task, seconds);
+                return;
+            }
+        }
+
+        // Task Management
+        if (command === "list tasks" || command === "what's on my schedule") {
+            await listTasks();
+            return;
+        }
+
+        if (command === "clear all tasks" || command === "clear schedule") {
+            await clearAll();
+            return;
+        }
+
+        if (command === "my stats" || command === "productivity stats") {
+            await getStats();
+            return;
+        }
+
+        // ============================================
         // WEBSITES
+        // ============================================
         if (command === "open youtube" || command === "youtube") {
             return openwebsite("https://youtube.com", "YouTube");
         }
@@ -245,7 +343,9 @@ async function handleCommand(cmdRaw) {
             return openwebsite("https://instagram.com", "Instagram");
         }
 
+        // ============================================
         // APPS
+        // ============================================
         if (command === "open chrome" || command === "chrome") {
             return openapp("Google Chrome");
         }
@@ -256,7 +356,9 @@ async function handleCommand(cmdRaw) {
             return openapp("Safari");
         }
 
+        // ============================================
         // FILES
+        // ============================================
         if (command === "create demo file") {
             return createfile("demo.txt", "This is a demo file");
         }
@@ -270,7 +372,9 @@ async function handleCommand(cmdRaw) {
             return openfile("demo.txt");
         }
 
+        // ============================================
         // UTILITIES
+        // ============================================
         if (command === "what time is it" || command === "time") {
             return speak(`The time is ${new Date().toLocaleTimeString()}`);
         }
@@ -278,7 +382,9 @@ async function handleCommand(cmdRaw) {
             return speak(`Today is ${new Date().toLocaleDateString()}`);
         }
 
+        // ============================================
         // POLITE
+        // ============================================
         if (command.includes("thank you") || command === "thanks") {
             return speak("You're welcome!");
         }
@@ -286,7 +392,9 @@ async function handleCommand(cmdRaw) {
             return speak("Goodbye! Have a great day!");
         }
 
+        // ============================================
         // UNKNOWN COMMAND
+        // ============================================
         await speak("Sorry, I did not understand that command.");
 
     } catch (err) {
@@ -345,11 +453,30 @@ try {
     await fetch("http://127.0.0.1:5000/status");
     console.log("✅ Voice listener connected");
     console.log("🎤 Listening for commands...");
-    console.log("\nTry saying:");
-    console.log("  - 'Jarvis'");
-    console.log("  - 'Start focus mode'");
-    console.log("  - 'Open YouTube'");
-    console.log("  - 'What time is it'\n");
+    console.log("\n📋 Available Commands:");
+    console.log("\n  🗣️  Wake Word:");
+    console.log("    - 'Jarvis'");
+    console.log("\n  🎯 Focus Mode:");
+    console.log("    - 'Start focus mode'");
+    console.log("    - 'End focus mode'");
+    console.log("\n  📊 Resource Monitoring:");
+    console.log("    - 'Start monitoring'");
+    console.log("    - 'Stop monitoring'");
+    console.log("    - 'System status'");
+    console.log("    - 'Optimize system'");
+    console.log("\n  ⏰ Time Management:");
+    console.log("    - 'Start pomodoro'");
+    console.log("    - 'Start focus session'");
+    console.log("    - 'End session'");
+    console.log("    - 'Short break'");
+    console.log("    - 'Remind me in 5 minutes to [task]'");
+    console.log("    - 'Remind me to drink water'");
+    console.log("    - 'List tasks'");
+    console.log("    - 'My stats'");
+    console.log("\n  🚀 Quick Actions:");
+    console.log("    - 'Open YouTube'");
+    console.log("    - 'What time is it'");
+    console.log("    - 'Open Chrome'\n");
 } catch {
     console.error("❌ Cannot connect to Python listener!");
     console.error("   Make sure to run: python3 listener.py");
