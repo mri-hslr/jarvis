@@ -14,43 +14,71 @@ import {
     endFocusMode
 } from "./focusManager.js";
 
+import {
+    startMonitoring,
+    stopMonitoring,
+    getSystemStatus,
+    optimizeSystem
+} from "./resourceMonitor.js";
+
 
 // =================================================
 // 1. IMPROVED SPEAK FUNCTION (GUARANTEED NO ECHO)
 // =================================================
-async function speak(text, voice = null, speed = 1.0) {
-    console.log(`SPEAKING: ${text}`);
+async function speak(text, voice = "Samantha", speed = 1.0) {
+    console.log(`🔊 SPEAKING: "${text}"`);
+    
+    // Track what we're saying to filter echoes
+    const phrases = text.toLowerCase().split(/[.!?,]+/).map(s => s.trim()).filter(Boolean);
+    phrases.forEach(p => recentSpeech.add(p));
+    setTimeout(() => {
+        phrases.forEach(p => recentSpeech.delete(p));
+    }, 10000);  // Remember for 10 seconds
 
-    // 1 — MUTE immediately
+    // 1 — MUTE immediately and WAIT for confirmation
     try {
         await fetch("http://127.0.0.1:5000/mute", { method: "POST" });
+        console.log("  ✓ Muted listener");
     } catch (err) {
-        console.log("⚠️ Mute failed:", err.message);
+        console.log("  ⚠️ Mute failed:", err.message);
     }
 
-    // 2 — Small delay to ensure mute takes effect
-    await new Promise(r => setTimeout(r, 100));
+    // 2 — CRITICAL: Wait longer to ensure mute is active
+    await new Promise(r => setTimeout(r, 300));
 
     // 3 — Speak with callback
-    await new Promise((resolve) => {
-        say.speak(text, voice, speed, () => {
-            // macOS audio buffer delay
-            setTimeout(resolve, 700);
+    console.log(`  🎵 Starting speech synthesis...`);
+    try {
+        await new Promise((resolve, reject) => {
+            say.speak(text, voice, speed, (error) => {
+                if (error) {
+                    console.error("  ❌ Speech error:", error);
+                    reject(error);
+                } else {
+                    console.log("  ✅ Speech synthesis completed");
+                    resolve();
+                }
+            });
         });
-    });
+    } catch (err) {
+        console.error("  ❌ Failed to speak:", err);
+    }
 
-    // 4 — Extra buffer to clear ANY remaining audio
-    await new Promise(r => setTimeout(r, 2000));
+    // 4 — CRITICAL: Long delay to let ALL audio finish playing
+    //     macOS audio output has significant buffer delay
+    await new Promise(r => setTimeout(r, 1500));
 
     // 5 — UNMUTE
     try {
         await fetch("http://127.0.0.1:5000/unmute", { method: "POST" });
+        console.log("  ✓ Unmuted listener");
     } catch (err) {
-        console.log("⚠️ Unmute failed:", err.message);
+        console.log("  ⚠️ Unmute failed:", err.message);
     }
 
-    // 6 — Small delay after unmute before listening
-    await new Promise(r => setTimeout(r, 200));
+    // 6 — Wait before next command to let mic stabilize
+    await new Promise(r => setTimeout(r, 500));
+    console.log("  ✓ Ready for next command\n");
 }
 
 export { speak };
@@ -104,10 +132,20 @@ async function openapp(appname) {
 // =================================================
 
 const recentCommands = new Map();
+const recentSpeech = new Set();  // Track what Jarvis just said
 let isProcessing = false;
 
 async function handleCommand(cmdRaw) {
     const command = cmdRaw.toLowerCase().trim();
+    
+    // CRITICAL: Filter out echo of Jarvis's own speech
+    // Check if this matches what Jarvis just said
+    for (const phrase of recentSpeech) {
+        if (command.includes(phrase) || phrase.includes(command)) {
+            console.log(`🔇 ECHO FILTERED: "${command}" (matches recent speech)`);
+            return;
+        }
+    }
     
     // Prevent duplicate/echo processing
     const now = Date.now();
@@ -178,6 +216,22 @@ async function handleCommand(cmdRaw) {
         if (command === "end focus mode" || command === "stop focus mode") {
             await endFocusMode();
             return;
+        }
+        // SYSTEM MONITORING
+        if (command === "start monitoring" || command === "monitor system") {
+            return startMonitoring();
+        }
+
+        if (command === "stop monitoring") {
+            return stopMonitoring();
+        }
+
+        if (command === "system status" || command === "check system") {
+            return getSystemStatus();
+        }
+
+        if (command === "optimize system" || command === "clean system") {
+            return optimizeSystem();
         }
 
         // WEBSITES
